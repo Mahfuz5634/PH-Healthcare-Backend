@@ -4,10 +4,26 @@ import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import type { IRequestUser } from "./auth.interface";
 import { AuthService } from "./auth.service";
+import z from "zod";
+
+
+const PatientRegistrationZodSchema = z.object({
+	name:z.string(),
+	email:z.email(),
+	password:z.string(),
+	patient:z.object({
+		contactNumber: z.string().optional()
+	}).optional()
+})
+
 
 const registerPatient = catchAsync(async (req: Request, res: Response) => {
-	const payload = req.body;
-	const result = await AuthService.registerPatient(payload);
+	const payload = PatientRegistrationZodSchema.safeParse(req.body);
+
+	if(!payload.success){
+		throw new Error(payload.error.message);
+	}
+	const result = await AuthService.registerPatient(payload.data);
 
 	const { accessToken, refreshToken, user, patient } = result;
 
@@ -117,7 +133,7 @@ const googleLogin = catchAsync(async (req: Request, res: Response) => {
 	const payload = req.body;
 
 	const result = await AuthService.googleLogin(payload);
-	const { accessToken, refreshToken } = result;
+	const { accessToken, refreshToken, user } = result;
 
 	res.cookie("accessToken", accessToken, {
 		httpOnly: true,
@@ -135,10 +151,11 @@ const googleLogin = catchAsync(async (req: Request, res: Response) => {
 	sendResponse(res, {
 		statusCode: httpStatus.OK,
 		success: true,
-		message: "New tokens generated successfully",
+		message: "User logged in successfully",
 		data: {
 			accessToken,
 			refreshToken,
+			user,
 		},
 	});
 });
