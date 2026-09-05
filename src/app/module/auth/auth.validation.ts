@@ -1,6 +1,6 @@
 import z from "zod";
 
-export const PatientRegistrationZodSchema = z.object({
+ const PatientRegistrationZodSchema = z.object({
   name: z
     .string({ message: "Name is required" })
     .trim()
@@ -32,7 +32,7 @@ export const PatientRegistrationZodSchema = z.object({
     .optional(),
 });
 
-export const LoginUserZodSchema = z.object({
+ const LoginUserZodSchema = z.object({
   email: z
     .email({ message: "Please provide a valid email address" })
     .trim()
@@ -41,3 +41,8 @@ export const LoginUserZodSchema = z.object({
     .string({ message: "Password is required" })
     .min(8, { message: "Password must be at least 8 characters long" }),
 });
+
+export const patientValidation ={
+    PatientRegistrationZodSchema,
+    LoginUserZodSchema 
+}

@@ -1,31 +1,12 @@
 import type { Request, Response } from "express";
 import httpStatus from "http-status";
-import z from "zod";
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import type { IRequestUser } from "./auth.interface";
 import { AuthService } from "./auth.service";
-import {
-  LoginUserZodSchema,
-  PatientRegistrationZodSchema,
-} from "./auth.validation";
-
-const formatZodErrorMessage = (error: z.ZodError) => {
-  return error.issues
-    .map((issue) => {
-      const field = issue.path.length ? issue.path.join(".") : "request";
-      return `${field}: ${issue.message}`;
-    })
-    .join("; ");
-};
 
 const registerPatient = catchAsync(async (req: Request, res: Response) => {
-  const payload = PatientRegistrationZodSchema.safeParse(req.body);
-
-  if (!payload.success) {
-    throw new Error(formatZodErrorMessage(payload.error));
-  }
-  const result = await AuthService.registerPatient(payload.data);
+  const result = await AuthService.registerPatient(req.body);
 
   const { accessToken, refreshToken, user, patient } = result;
 
@@ -56,13 +37,7 @@ const registerPatient = catchAsync(async (req: Request, res: Response) => {
 });
 
 const loginUser = catchAsync(async (req: Request, res: Response) => {
-  const payload = LoginUserZodSchema.safeParse(req.body);
-
-  if (!payload.success) {
-    throw new Error(formatZodErrorMessage(payload.error));
-  }
-
-  const result = await AuthService.loginUser(payload.data);
+  const result = await AuthService.loginUser(req.body);
   const { accessToken, refreshToken } = result;
 
   res.cookie("accessToken", accessToken, {
