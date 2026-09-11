@@ -10,6 +10,8 @@ import config from "./app/config";
 import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
 import { notFound } from "./app/middleware/notFound";
 import { AuthRoutes } from "./app/module/auth/auth.route";
+import { redisClient } from "./app/lib/redis";
+import crypto from "crypto";
 
 const app: Application = express();
 
@@ -35,6 +37,19 @@ app.get("/", async (req: Request, res: Response) => {
 		success: true,
 		message: "Welcome to PH Healthcare System Backend",
 	});
+});
+
+
+// Redis connection test route
+app.get("/redis-test",async (req: Request, res: Response) => {
+
+	  const otp = crypto.randomInt(1000,9999).toString();
+	  await redisClient.set("user_password:mahfuz@gmail.com", otp,{
+		 expiration:{
+			type:"EX",
+			value:60
+		 }
+	  });
 });
 
 app.use(globalErrorHandler);

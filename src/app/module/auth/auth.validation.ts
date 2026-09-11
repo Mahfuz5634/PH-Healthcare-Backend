@@ -42,6 +42,31 @@ const LoginUserZodSchema = z.object({
 		.min(8, { message: "Password must be at least 8 characters long" }),
 });
 
+const IForgotPasswordZodSchema = z.object({
+	email: z
+		.email({ message: "Please provide a valid email address" })
+		.trim()
+		.toLowerCase(),
+});
+
+const IResetPasswordZodSchema = z.object({
+	email: z
+		.email({ message: "Please provide a valid email address" })
+		.trim()
+		.toLowerCase(),
+	otp: z.string({ message: "Otp is required" }).trim(),
+	newPassword: z
+		.string({ message: "New password is required" })
+		.min(8, { message: "New password must be at least 8 characters long" }),
+});
+
+export const authValidation = {
+	PatientRegistrationZodSchema,
+	LoginUserZodSchema,
+	IForgotPasswordZodSchema,
+	IResetPasswordZodSchema,
+};
+
 export const patientValidation = {
 	PatientRegistrationZodSchema,
 	LoginUserZodSchema,
