@@ -1,4 +1,6 @@
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
+import type { TokenPayload } from "google-auth-library";
 import type { JwtPayload, SignOptions } from "jsonwebtoken";
 import {
 	AuthProvider,
@@ -6,21 +8,19 @@ import {
 	UserStatus,
 } from "../../../generated/prisma/enums";
 import config from "../../config";
+import { googleClient } from "../../lib/googleAuth";
 import { prisma } from "../../lib/prisma";
+import { redisClient } from "../../lib/redis";
+import { sendEmail } from "../../utils/email";
 import { jwtUtils } from "../../utils/jwt";
 import type {
+	IForgotPasswordPayload,
 	IGoogleLoginPayload,
 	ILoginUserPayload,
 	IRegisterPatientPayload,
 	IRequestUser,
+	IResetPasswordPayload,
 } from "./auth.interface";
-import type { TokenPayload } from "google-auth-library";
-import { googleClient } from "../../lib/googleAuth";
-import { authValidation } from "./auth.validation";
-import crypto from "crypto";
-import { redisClient } from "../../lib/redis";
-import { number } from "zod";
-import { transporter } from "../../lib/nodemailer";
 
 const registerPatient = async (payload: IRegisterPatientPayload) => {
 	const { name, password } = payload;
@@ -305,102 +305,128 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 	};
 };
 
-const forgotPassword = async (payload: any) => {
-	const {email}=payload;
+const forgotPassword = async (payload: IForgotPasswordPayload) => {
+	const email = payload.email.trim().toLowerCase();
 
 	const isUserExist = await prisma.user.findUnique({
-		where:{
-			email
-		}
-	});
-
-	if(!isUserExist){
-		throw new Error("User Not Found!")
-	}
-
-	if(isUserExist.status==="BLOCKED"){
-        throw new Error("User is Blocked")
-	}
-	if(!isUserExist.emailVerified){
-		throw new Error("User is not verified!")
-	}
-	if(isUserExist.isDeleted  || isUserExist.status === "DELETED"){
-		 throw new Error("User is Blocked")
-	}
-	if( isUserExist.googleId &&  isUserExist.authProvider==="GOOGLE"){
-		throw new Error("User has account with Google!")
-	}
-     
-	 const key=`forgot-password-otp:${isUserExist.email}`
-	 const otp = crypto.randomInt(1000,9999).toString();
-	 await redisClient.set(key, otp,{
-			 expiration:{
-				type:"EX",
-				value:5*60
-			 }
-		  });
-	await transporter.sendMail({
-		from: config.SMTP_USER,
-		to: isUserExist.email,
-		subject: "Password Reset OTP",
-        html: `<p>Your OTP for password reset is: <strong>${otp}</strong></p><p>This OTP is valid for 5 minutes.</p>`,
-	});
-};
-
-
-const resetPassword = async (payload:any) => {
-	const {email,otp,newPassword}=payload;
-
-	const isUserExist = await prisma.user.findUnique({
-		where:{
-			email
-		}
-	});
-
-	if(!isUserExist){
-		throw new Error("User Not Found!")
-	}
-
-	if(isUserExist.status==="BLOCKED"){
-        throw new Error("User is Blocked")
-	}
-	if(!isUserExist.emailVerified){
-		throw new Error("User is not verified!")
-	}
-	if(isUserExist.isDeleted  || isUserExist.status === "DELETED"){
-		 throw new Error("User is Blocked")
-	}
-	if( isUserExist.googleId &&  isUserExist.authProvider==="GOOGLE"){
-		throw new Error("User has account with Google!")
-	}
-	const key=`forgot-password-otp:${isUserExist.email}`;
-
-	const redisOtp = redisClient.get(key);
-	if(!redisOtp){
-		throw new  Error("Invalid Otp");
-	}
-	if(redisOtp !== otp){
-		throw new Error("Otp does not match!")
-	}
-	const hashedPassword = await bcrypt.hash(newPassword,Number(config.bcrypt_salt_rounds));
-	await prisma.user.update({
-		where : {
-			email:isUserExist.email
+		where: {
+			email,
 		},
-		data:{
-			password:hashedPassword
-		}
-	})
-	await redisClient.del([key]);
-	await transporter.sendMail({
-		from: config.SMTP_USER,
+	});
+
+	if (!isUserExist) {
+		throw new Error("User with this email does not exist!");
+	}
+
+	if (isUserExist.status === UserStatus.BLOCKED) {
+		throw new Error("User account is blocked! Please contact support.");
+	}
+	if (isUserExist.isDeleted || isUserExist.status === UserStatus.DELETED) {
+		throw new Error("User account has been deleted!");
+	}
+	if (!isUserExist.emailVerified) {
+		throw new Error("User email is not verified!");
+	}
+	if (
+		isUserExist.googleId &&
+		isUserExist.authProvider === AuthProvider.GOOGLE &&
+		!isUserExist.password
+	) {
+		throw new Error(
+			"This account was registered using Google. Please log in with Google.",
+		);
+	}
+
+	const key = `forgot-password-otp:${isUserExist.email}`;
+
+	// Cooldown check: prevent requesting a new OTP within 60 seconds
+	const remainingTtl = await redisClient.ttl(key);
+	if (remainingTtl > 240) {
+		const waitSeconds = remainingTtl - 240;
+		throw new Error(
+			`Please wait ${waitSeconds} seconds before requesting a new OTP.`,
+		);
+	}
+
+	// 6-digit secure OTP
+	const otp = crypto.randomInt(100000, 999999).toString();
+	await redisClient.set(key, otp, {
+		expiration: {
+			type: "EX",
+			value: 5 * 60, // 5 minutes validity
+		},
+	});
+
+	await sendEmail({
 		to: isUserExist.email,
-		subject: "Password Reset Successful",
-        html: `<p>Your password has been reset successfully.</p>`,
+		subject: "Password Reset Code - PH Healthcare",
+		templateName: "forgot-password",
+		templateData: {
+			name: isUserExist.name,
+			otp,
+			expiresInMinutes: 5,
+		},
 	});
 };
-	
 
+const resetPassword = async (payload: IResetPasswordPayload) => {
+	const { otp, newPassword } = payload;
+	const email = payload.email.trim().toLowerCase();
+
+	const isUserExist = await prisma.user.findUnique({
+		where: {
+			email,
+		},
+	});
+
+	if (!isUserExist) {
+		throw new Error("User with this email does not exist!");
+	}
+
+	if (isUserExist.status === UserStatus.BLOCKED) {
+		throw new Error("User account is blocked! Please contact support.");
+	}
+	if (isUserExist.isDeleted || isUserExist.status === UserStatus.DELETED) {
+		throw new Error("User account has been deleted!");
+	}
+	if (!isUserExist.emailVerified) {
+		throw new Error("User email is not verified!");
+	}
+
+	const key = `forgot-password-otp:${isUserExist.email}`;
+
+	// Fix missing await
+	const redisOtp = await redisClient.get(key);
+	if (!redisOtp) {
+		throw new Error("OTP has expired or is invalid. Please request a new one.");
+	}
+	if (redisOtp !== otp.trim()) {
+		throw new Error("Invalid OTP! Please check the code sent to your email.");
+	}
+
+	const saltRounds = Number(config.bcrypt_salt_rounds) || 10;
+	const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+	await prisma.user.update({
+		where: {
+			email: isUserExist.email,
+		},
+		data: {
+			password: hashedPassword,
+			needPasswordChange: false,
+		},
+	});
+
+	await redisClient.del([key]);
+
+	await sendEmail({
+		to: isUserExist.email,
+		subject: "Password Reset Successful - PH Healthcare",
+		templateName: "reset-password-success",
+		templateData: {
+			name: isUserExist.name,
+		},
+	});
 };
 
 export const AuthService = {

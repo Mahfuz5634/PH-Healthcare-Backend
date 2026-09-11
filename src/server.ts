@@ -12,16 +12,26 @@ const main = async () => {
 		await prisma.$connect();
 		await seedUsers();
 		console.log("Connected to the database successfully.");
+
 		await redisClient.connect();
 		console.log("Redis connected successfully.");
-		await transporter.verify();
-		console.log("Nodemailer transporter verified successfully.");
+
+		try {
+			await transporter.verify();
+			console.log("Nodemailer transporter verified successfully.");
+		} catch (smtpError) {
+			console.warn("⚠️ SMTP verification warning:", smtpError);
+		}
+
 		app.listen(PORT, () => {
 			console.log(`Server is running on port ${PORT}`);
 		});
 	} catch (error) {
 		console.error("Error starting the server:", error);
 		await prisma.$disconnect();
+		if (redisClient.isOpen) {
+			await redisClient.quit().catch(() => {});
+		}
 		process.exit(1);
 	}
 };

@@ -53,7 +53,6 @@ const seedSingleUser = async (user: ISeedUser) => {
 	const saltRounds = Number(config.bcrypt_salt_rounds) || 10;
 	const hashedPassword = await bcrypt.hash(user.password, saltRounds);
 
-
 	await prisma.$transaction(async (tx) => {
 		await tx.user.create({
 			data: {
