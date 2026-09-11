@@ -20,6 +20,7 @@ import { authValidation } from "./auth.validation";
 import crypto from "crypto";
 import { redisClient } from "../../lib/redis";
 import { number } from "zod";
+import { transporter } from "../../lib/nodemailer";
 
 const registerPatient = async (payload: IRegisterPatientPayload) => {
 	const { name, password } = payload;
@@ -338,6 +339,12 @@ const forgotPassword = async (payload: any) => {
 				value:5*60
 			 }
 		  });
+	await transporter.sendMail({
+		from: config.SMTP_USER,
+		to: isUserExist.email,
+		subject: "Password Reset OTP",
+        html: `<p>Your OTP for password reset is: <strong>${otp}</strong></p><p>This OTP is valid for 5 minutes.</p>`,
+	});
 };
 
 
@@ -385,6 +392,13 @@ const resetPassword = async (payload:any) => {
 		}
 	})
 	await redisClient.del([key]);
+	await transporter.sendMail({
+		from: config.SMTP_USER,
+		to: isUserExist.email,
+		subject: "Password Reset Successful",
+        html: `<p>Your password has been reset successfully.</p>`,
+	});
+};
 	
 
 };
