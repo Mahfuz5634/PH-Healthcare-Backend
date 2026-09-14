@@ -31,21 +31,16 @@ const setAuthCookies = (
 };
 
 const registerPatient = catchAsync(async (req: Request, res: Response) => {
-	const result = await AuthService.registerPatient(req.body);
-	const { accessToken, refreshToken, user, patient } = result;
+	 await AuthService.registerPatient(req.body);
 
-	setAuthCookies(res, accessToken, refreshToken);
+
+	
 
 	sendResponse(res, {
 		statusCode: httpStatus.CREATED,
 		success: true,
 		message: "Patient registered successfully",
-		data: {
-			accessToken,
-			refreshToken,
-			user,
-			patient,
-		},
+		data: null,
 	});
 });
 
