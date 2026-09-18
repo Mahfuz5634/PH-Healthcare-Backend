@@ -13,6 +13,11 @@ router.post(
 	AuthController.registerPatient,
 );
 router.post(
+	"/verify-email",
+	validateRequest(patientValidation.VerifyEmailZodSchema),
+	AuthController.verifyPatientEmail,
+);
+router.post(
 	"/login",
 	validateRequest(patientValidation.LoginUserZodSchema),
 	AuthController.loginUser,

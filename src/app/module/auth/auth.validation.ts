@@ -1,3 +1,4 @@
+import { verify } from "node:crypto";
 import z from "zod";
 
 const PatientRegistrationZodSchema = z.object({
@@ -60,14 +61,25 @@ const IResetPasswordZodSchema = z.object({
 		.min(8, { message: "New password must be at least 8 characters long" }),
 });
 
+const VerifyEmailZodSchema = z.object({
+	email: z
+		.email({ message: "Please provide a valid email address" })
+		.trim()
+		.toLowerCase(),
+	otp: z.string({ message: "Otp is required" }).trim(),
+});
+
 export const authValidation = {
 	PatientRegistrationZodSchema,
 	LoginUserZodSchema,
 	IForgotPasswordZodSchema,
 	IResetPasswordZodSchema,
+	verifyEmailZodSchema: VerifyEmailZodSchema,
+		
 };
 
 export const patientValidation = {
 	PatientRegistrationZodSchema,
 	LoginUserZodSchema,
+	
 };

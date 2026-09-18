@@ -20,6 +20,7 @@ import type {
 	IRegisterPatientPayload,
 	IRequestUser,
 	IResetPasswordPayload,
+	IVerifyPatientEmailOtpPayload,
 } from "./auth.interface";
 
 const registerPatient = async (payload: IRegisterPatientPayload) => {
@@ -129,6 +130,102 @@ const registerPatient = async (payload: IRegisterPatientPayload) => {
 	// 	accessToken,
 	// 	refreshToken,
 	// };
+};
+
+const verifyPatientEmailOtp = async (payload: IVerifyPatientEmailOtpPayload) => {
+	 
+const email = payload.email.trim().toLowerCase();
+
+	const isUserExists = await prisma.user.findUnique({
+		where: { email },
+	});
+
+	
+
+	if (isUserExists) {
+		throw new Error("User with this email already exists");
+	}
+	if(isUserExists && isUserExists?.emailVerified){
+		throw new Error("Email is already verified");
+	}
+	if(!isUserExists?.status || isUserExists?.status !== UserStatus.ACTIVE){
+		throw new Error("User is not active");
+	}
+
+	const otpkey = `patientReg-otp:${email}`;
+
+	const storedOtp = await redisClient.get(otpkey);
+
+	if (!storedOtp || storedOtp !== payload.otp) {
+		throw new Error("Invalid or expired OTP");
+	}
+	await redisClient.del(otpkey);
+	const patientRegistrationkey= `patientRegistrationData:${email}`;
+	const redisUserData = await redisClient.get(patientRegistrationkey);
+	if (!redisUserData) {
+		throw new Error("Registration data not found or expired");
+	}
+	
+	const userData:IRegisterPatientPayload = JSON.parse(redisUserData);	
+	const createdUser = await prisma.user.create({
+		data: {
+			name: userData.name,
+			email: userData.email,
+			password: userData.password,
+			role: Role.PATIENT,
+			status: UserStatus.ACTIVE,
+			emailVerified: true,
+			patient: {
+				create: { name: userData.name, email: userData.email ,contactNumber:userData.patient?.contactNumber},
+			},
+		},
+		omit: { password: true },
+		include: { patient: true },
+	});
+	await redisClient.del(patientRegistrationkey);
+	await redisClient.del(otpkey);
+	await redisClient.del(`patientReg-otp:${email}`);
+	
+	await transporter.sendMail({
+		from: config.email_from,
+		to: email,
+		subject: "Email verified successfully - PH Healthcare",
+		html: `<p>Dear ${userData.name},</p>
+			   <p>Your email has been successfully verified. You can now log in to your account.</p>
+			   <p>Thank you for choosing PH Healthcare!</p>`,
+	});
+
+	const { patient, ...user } = createdUser;
+	const jwtPayload = {
+		userId: user.id,
+		name: user.name,
+		email: user.email,
+		role: user.role,
+	};
+
+	const accessToken = jwtUtils.createToken(
+		jwtPayload,
+		config.jwt_access_secret,
+		config.jwt_access_expires_in as SignOptions,
+	);
+
+	const refreshToken = jwtUtils.createToken(
+		jwtPayload,
+		config.jwt_refresh_secret,
+		config.jwt_refresh_expires_in as SignOptions,
+	);
+
+	return {
+		user,
+		patient,
+		accessToken,
+		refreshToken,
+	};
+
+
+
+	
+
 };
 
 const loginUser = async (payload: ILoginUserPayload) => {
@@ -323,6 +420,14 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 				},
 			},
 		});
+		await trasporter.sendMail({
+			from: config.email_from,
+			to: email,
+			subject: "Welcome to PH Healthcare",
+			html: `<p>Dear ${name},</p>
+				   <p>Welcome to PH Healthcare! Your account has been successfully created using your Google account.</p>
+				   <p>Thank you for choosing PH Healthcare!</p>`,
+		});
 	}
 
 	const jwtPayload = {
@@ -482,6 +587,7 @@ const resetPassword = async (payload: IResetPasswordPayload) => {
 
 export const AuthService = {
 	registerPatient,
+	verifyPatientEmailOtp,
 	loginUser,
 	getMe,
 	refreshToken,
