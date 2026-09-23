@@ -15,7 +15,7 @@ const UploadProfileImage = async (buffer: Buffer) => {
         }).end(buffer);
     });
 }
-
+//when user reuploads the image, we need to delete the previous image from cloudinary
 
 export const userServices = {
     UploadProfileImage
