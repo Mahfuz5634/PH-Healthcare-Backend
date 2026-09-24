@@ -1,4 +1,3 @@
-import { verify } from "node:crypto";
 import z from "zod";
 
 const PatientRegistrationZodSchema = z.object({
@@ -74,12 +73,11 @@ export const authValidation = {
 	LoginUserZodSchema,
 	IForgotPasswordZodSchema,
 	IResetPasswordZodSchema,
-	verifyEmailZodSchema: VerifyEmailZodSchema,
-		
+	VerifyEmailZodSchema,
 };
 
 export const patientValidation = {
 	PatientRegistrationZodSchema,
 	LoginUserZodSchema,
-	
+	VerifyEmailZodSchema,
 };

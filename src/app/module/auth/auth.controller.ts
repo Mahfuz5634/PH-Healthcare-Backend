@@ -31,28 +31,28 @@ const setAuthCookies = (
 };
 
 const registerPatient = catchAsync(async (req: Request, res: Response) => {
-	 await AuthService.registerPatient(req.body);
-
-
-	
+	await AuthService.registerPatient(req.body);
 
 	sendResponse(res, {
-		statusCode: httpStatus.CREATED,
+		statusCode: httpStatus.OK,
 		success: true,
-		message: "Patient registered successfully",
+		message:
+			"Verification OTP sent to your email. Please verify to complete registration.",
 		data: null,
 	});
 });
 
 const verifyPatientEmail = catchAsync(async (req: Request, res: Response) => {
 	const payload = req.body;
-	await AuthService.verifyPatientEmailOtp(payload);
+	const result = await AuthService.verifyPatientEmailOtp(payload);
+
+	setAuthCookies(res, result.accessToken, result.refreshToken);
 
 	sendResponse(res, {
-		statusCode: httpStatus.OK,
+		statusCode: httpStatus.CREATED,
 		success: true,
-		message: "Email verified successfully",
-		data: null,
+		message: "Email verified successfully and user logged in",
+		data: result,
 	});
 });
 
