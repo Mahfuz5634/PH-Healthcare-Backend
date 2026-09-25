@@ -8,7 +8,7 @@ model User {
   emailVerified      Boolean    @default(false)
   role               Role       @default(PATIENT)
   imageUrl              String?
-  image_publicId    String?
+  image_publicId    String? 
   status             UserStatus @default(ACTIVE)
   needPasswordChange Boolean    @default(false)
   isDeleted          Boolean    @default(false)
