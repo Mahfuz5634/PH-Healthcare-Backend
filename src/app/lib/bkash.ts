@@ -11,8 +11,9 @@ export const getBkashIdToken = async () => {
        let BkashidToken = await redisClient.get(idTokenKey);
        let BkashRefreshToken = await redisClient.get(refreshTokenKey);
        const BkashIdTokenttl = await redisClient.ttl(idTokenKey);
+       const BkashRefreshTokenttl = await redisClient.ttl(refreshTokenKey);
 
-       if(BkashIdTokenttl <= 600 && BkashRefreshToken){
+       if(BkashIdTokenttl <= 600 && BkashRefreshToken && BkashRefreshTokenttl > 600){
         //if id token is not found but refresh token is found then get new id token using refresh token
         const response = await fetch(`${config.bkash_base_url}/tokenized/checkout/token/refresh`, {
           method: "POST",
@@ -40,7 +41,7 @@ export const getBkashIdToken = async () => {
         return data.id_token;
       }
 
-       if (BkashidToken) {
+       if (BkashIdTokenttl > 600) {
         return BkashidToken;
       }
      
