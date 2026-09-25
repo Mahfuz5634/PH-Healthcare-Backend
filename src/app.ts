@@ -33,9 +33,21 @@ app.use(cookieParser());
 app.use("/api/v1/auth", AuthRoutes);
 app.use("/api/v1/user", UserRoutes);
 
-app.get("/test", async () => {
-	const data= await getBkashIdToken()
-	console.log(data);
+app.get("/test-bkash", async (req: Request, res: Response) => {
+	try {
+		const data = await getBkashIdToken();
+		console.log(data);
+		res.status(httpStatus.OK).json({
+			success: true,
+			data,
+		});
+	} catch (error) {
+		console.error("Error in /test-bkash route:", error);
+		res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
+			success: false,
+			message: "Failed to retrieve bKash ID token",
+		});
+	}
 });
 
 // Basic health check route
