@@ -5,12 +5,8 @@ import { AuthService } from "../auth/auth.service";
 import { Request, Response } from "express";
 import { AppointmentService } from "./appointment.service";
 
-
 const bookAppointment = catchAsync(async (req: Request, res: Response) => {
-
-    const result = await AppointmentService.bookAppointment();
-
-	
+	const result = await AppointmentService.bookAppointment();
 
 	sendResponse(res, {
 		statusCode: httpStatus.OK,
@@ -20,8 +16,6 @@ const bookAppointment = catchAsync(async (req: Request, res: Response) => {
 	});
 });
 
-
-
 export const AppointmentController = {
-    bookAppointment,
+	bookAppointment,
 };

@@ -13,7 +13,6 @@ import { notFound } from "./app/middleware/notFound";
 import { AuthRoutes } from "./app/module/auth/auth.route";
 import { UserRoutes } from "./app/module/user/user.route";
 import { getBkashIdToken } from "./app/lib/bkash";
-import { AppoinmentRoutes, appoinmentRoutes } from "./app/module/appoinment/appoinment.route";
 import { AppointmentRoutes } from "./app/module/appoinment/appointment.route";
 
 const app: Application = express();
