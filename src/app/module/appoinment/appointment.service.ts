@@ -1,8 +1,19 @@
+import { AppointmentStatus } from "../../../generated/prisma/enums";
 import config from "../../config";
 import { getBkashIdToken } from "../../lib/bkash";
+import { prisma } from "../../lib/prisma";
 
-const bookAppointment = async () => {
-	const idToken = await getBkashIdToken();
+const bookAppointment = async (payload:any,user:any) => {
+	const transactionResult= await prisma.$transaction(async (tx) => {
+    
+		const appointment = await tx.appointment.create({
+			data: {
+				
+				 status: AppointmentStatus.PENDING,
+			},
+		});
+
+		const idToken = await getBkashIdToken();
 
 	const bkashCreatePayment = await fetch(
 		`${config.bkash_base_url}/tokenized/checkout/create`,
@@ -16,11 +27,11 @@ const bookAppointment = async () => {
 			},
 			body: JSON.stringify({
 				mode: "0011",
-				payerReference: "01700000000",
+				payerReference: user.email,
 				amount: "100.00",
 				currency: "BDT",
 				intent: "sale",
-				merchantInvoiceNumber: `INV_${Date.now()}`,
+				merchantInvoiceNumber: `appointment-${appointment.id}`,
 				callbackURL: `${config.bkash_callback_url}/appointment/book-appointment/payment/callback`,
 			}),
 		},
@@ -39,7 +50,21 @@ const bookAppointment = async () => {
 		);
 	}
 
+	const payment = tx.payment.create({
+		data: {
+			merchantInvoiceNumber: bkashCreatePaymentResponse.merchantInvoiceNumber,
+			appointmentId: appointment.id,
+			paymentId: bkashCreatePaymentResponse.paymentID,
+			ammount: bkashCreatePaymentResponse.amount,
+			currency: bkashCreatePaymentResponse.currency,
+			intent: bkashCreatePaymentResponse.intent,
+			payerReference: bkashCreatePaymentResponse.payerReference,
+			status: "PENDING",
+		},
+	});
+
 	return bkashCreatePaymentResponse;
+	})
 };
 
 const bookAppointmentCallback = async (query: Record<string, any>) => {

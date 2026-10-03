@@ -6,7 +6,11 @@ import { Request, Response } from "express";
 import { AppointmentService } from "./appointment.service";
 
 const bookAppointment = catchAsync(async (req: Request, res: Response) => {
-	const result = await AppointmentService.bookAppointment();
+
+	const body= req.body;
+	const user=req.user!;
+
+	const result = await AppointmentService.bookAppointment(body, user);
 
 	sendResponse(res, {
 		statusCode: httpStatus.OK,
